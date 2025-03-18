@@ -1,0 +1,47 @@
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - WS_DB_HOST=psql_ws
+      - WS_DB_PORT=5432
+      - WS_DB_DATABASE=${WS_DB_DATABASE:-webhook_service}
+      - WS_DB_USERNAME=${WS_DB_USERNAME:-admin}
+      - WS_DB_PASSWORD=${WS_DB_PASSWORD:-password1234}
+      - WS_DB_SCHEMA=${WS_DB_SCHEMA:-public}
+    depends_on:
+      psql_ws:
+        condition: service_healthy
+    networks:
+      - webhook-network
+
+  psql_ws:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${WS_DB_DATABASE:-webhook_service}
+      POSTGRES_USER: ${WS_DB_USERNAME:-admin}
+      POSTGRES_PASSWORD: ${WS_DB_PASSWORD:-password1234}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "${WS_DB_PORT:-5432}:5432"
+    volumes:
+      - psql_volume_ws:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WS_DB_USERNAME:-admin} -d ${WS_DB_DATABASE:-webhook_service}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - webhook-network
+
+networks:
+  webhook-network:
+    driver: bridge
+
+volumes:
+  psql_volume_ws:
+    driver: local
